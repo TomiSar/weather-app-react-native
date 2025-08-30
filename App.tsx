@@ -1,88 +1,115 @@
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import {
-  Button,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { fetchCurrentWeather } from './services/weatherApi';
-import {
-  deleteHomeCity,
-  getHomeCity,
-  saveHomeCity,
-} from './storage/preferences';
+import { WeatherAPIResponse } from './types';
+import { deleteHomeCity, getHomeCity, saveHomeCity } from './storage/preferences';
 
 export default function App() {
   const [city, setCity] = useState('');
   const [homeCity, setHomeCity] = useState('');
-  const [weather, setWeather] = useState<any>(null);
+  const [weather, setWeather] = useState<WeatherAPIResponse | null>(null);
+  const [hasLoadedInitialCity, setHasLoadedInitialCity] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [inputError, setInputError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const loadSavedCity = async () => {
+    const loadInitialState = async () => {
       const savedCity = await getHomeCity();
       if (savedCity) {
-        setCity(savedCity);
         setHomeCity(savedCity);
-        handleSearch(savedCity);
       }
+      setHasLoadedInitialCity(true);
     };
-    loadSavedCity();
+    loadInitialState();
   }, []);
 
-  const handleSearch = async (searchCity?: string) => {
+  const handleSearchCity = async (searchCity?: string) => {
     const targetCity = searchCity || city;
-    if (!targetCity) return;
+    setInputError(null);
+    setError(null);
+    setWeather(null);
+
+    if (!targetCity) {
+      setInputError('Please enter a city name');
+      return;
+    }
+
     setLoading(true);
+
     try {
-      const data = await fetchCurrentWeather(targetCity);
-      setWeather(data);
-      await saveHomeCity(targetCity);
-      setHomeCity(targetCity);
-    } catch (error) {
+      const data: WeatherAPIResponse = await fetchCurrentWeather(targetCity);
+      // desctrucuring
+      const { location } = data;
+      if (data && location && location.name) {
+        setWeather(data);
+        await saveHomeCity(targetCity);
+        setHomeCity(targetCity);
+      } else {
+        // API Response Error
+        throw new Error('Received unexpected weather data format.');
+      }
+    } catch (error: unknown) {
       console.error('Weather fetch failed:', error);
+      if (error instanceof Error) {
+        setError(error.message);
+      } else {
+        setError('Failed to fetch Weather data');
+      }
+      setWeather(null);
     } finally {
       setLoading(false);
+      setCity('');
     }
+  };
+
+  const handleCityChange = (cityText: string) => {
+    setCity(cityText);
+    if (cityText) {
+      setInputError(null);
+    }
+  };
+
+  const handleRemoveHomeCity = async () => {
+    await deleteHomeCity();
+    setHomeCity('');
+    setWeather(null);
+    setError(null);
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>
-        Enter City want to search weather broadcast
-      </Text>
+      <Text style={styles.appTitle}>Weather Application</Text>
+      <Text style={styles.searchTitle}>Search weather in city</Text>
       <TextInput
-        style={styles.input}
+        style={[styles.input, inputError ? styles.inputError : {}]}
         value={city}
-        onChangeText={setCity}
+        onChangeText={handleCityChange}
         placeholder='Enter City...'
       />
-
-      <TouchableOpacity
-        style={styles.searchButton}
-        onPress={() => handleSearch()}
-      >
+      {inputError && <Text style={styles.inputErrorMessage}>{inputError}</Text>}
+      <TouchableOpacity style={styles.searchButton} onPress={() => handleSearchCity()}>
         <Text style={styles.buttonText}>Search weather</Text>
       </TouchableOpacity>
-
-      <TouchableOpacity
-        style={styles.deleteButton}
-        onPress={() => deleteHomeCity()}
-      >
-        <Text style={styles.buttonText}>Clear home city</Text>
+      <TouchableOpacity style={styles.removeButton} onPress={handleRemoveHomeCity}>
+        <Text style={styles.buttonText}>Remove home city</Text>
       </TouchableOpacity>
-
+      {error && <Text style={styles.error}>{error}</Text>}
       {loading && <Text>Loading...</Text>}
-      {weather && (
-        <View style={styles.result}>
-          <Text>City: {weather.location.name}</Text>
-          <Text>Temperature: {weather.current.temp_c}°C</Text>
-          <Text>Condition: {weather.current.condition.text}</Text>
-          {homeCity && <Text>Home city: {homeCity}</Text>}
-        </View>
+
+      {weather && hasLoadedInitialCity && weather.location && (
+        <>
+          <Text style={styles.searchResult}>Weather search result</Text>
+          <View style={styles.result}>
+            <Text>Country: {weather.location.country}</Text>
+            <Text>City: {weather.location.name}</Text>
+            <Text>Local time: {weather.location.localtime}</Text>
+            <Text>Temperature: {weather.current.temp_c}°C</Text>
+            <Text>Condition: {weather.current.condition.text}</Text>
+            {homeCity && <Text>Home city: {homeCity}</Text>}
+          </View>
+        </>
       )}
       <StatusBar style='auto' />
     </View>
@@ -90,8 +117,21 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 20 },
-  title: { fontSize: 18, marginBottom: 10 },
+  container: { padding: 20, marginBottom: 50, paddingTop: 60 },
+  appTitle: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    color: '#333',
+    marginBottom: 30,
+  },
+  searchTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    textAlign: 'left',
+    marginBottom: 10,
+    marginTop: 20,
+  },
   input: {
     borderWidth: 1,
     borderColor: '#ccc',
@@ -99,14 +139,21 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     borderRadius: 5,
   },
-
+  inputError: {
+    borderColor: 'red',
+  },
+  inputErrorMessage: {
+    fontSize: 16,
+    color: 'red',
+    marginBottom: 20,
+  },
   searchButton: {
     backgroundColor: 'green',
     padding: 10,
     borderRadius: 5,
     marginBottom: 10,
   },
-  deleteButton: {
+  removeButton: {
     backgroundColor: 'red',
     padding: 10,
     borderRadius: 5,
@@ -116,5 +163,15 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontWeight: 'bold',
   },
-  result: { marginTop: 20 },
+  error: {
+    color: 'red',
+    marginTop: 10,
+  },
+  searchResult: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    textAlign: 'left',
+    marginTop: 20,
+  },
+  result: { marginTop: 10 },
 });
