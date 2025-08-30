@@ -36,6 +36,11 @@ A React Native weather app built with Expo and TypeScript. This app fetches curr
 - [WeatherAPI](https://www.weatherapi.com/)
 - [OpenWeatherMap](https://home.openweathermap.org/)
 
+### For API to work you'll need Weather API Key Env (create local .env file with values)
+
+WEATHER_API_URL=https://api.weatherapi.com/v1/current.json?key=  
+WEATHER_API_KEY=<YOUR_WEATHER_API_KEY>
+
 ### Testing
 
 - [Jest](https://jestjs.io/docs/getting-started)
