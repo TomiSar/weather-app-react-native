@@ -1,32 +1,53 @@
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { fetchCurrentWeather } from './services/weatherApi';
 import { WeatherAPIResponse } from './types';
-import { deleteHomeCity, getHomeCity, saveHomeCity } from './storage/preferences';
+import {
+  deleteHomeCity,
+  getHomeCity,
+  saveHomeCity,
+} from './storage/preferences';
+import SearchBar from './components/SearchBar';
+import RemoveHomeCityButton from './components/RemoveHomeCityButton';
+import WeatherResult from './components/WeatherResult';
+import StatusDisplay from './components/StatusDisplay';
 
 export default function App() {
   const [city, setCity] = useState('');
   const [homeCity, setHomeCity] = useState('');
   const [weather, setWeather] = useState<WeatherAPIResponse | null>(null);
-  const [hasLoadedInitialCity, setHasLoadedInitialCity] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [notification, setNotification] = useState<string | null>(null);
   const [inputError, setInputError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const loadInitialState = async () => {
-      const savedCity = await getHomeCity();
-      if (savedCity) {
-        setHomeCity(savedCity);
+      let savedHomeCity = await getHomeCity();
+
+      if (savedHomeCity) {
+        try {
+          const data: WeatherAPIResponse = await fetchCurrentWeather(
+            savedHomeCity,
+          );
+          const { location } = data;
+          savedHomeCity =
+            savedHomeCity !== location.name ? location.name : savedHomeCity;
+
+          setHomeCity(savedHomeCity);
+          setWeather(data);
+        } catch (error) {
+          console.error('Initial weather fetch failed:', error);
+          setError('Could not load weather for saved city.');
+        }
       }
-      setHasLoadedInitialCity(true);
     };
     loadInitialState();
   }, []);
 
   const handleSearchCity = async (searchCity?: string) => {
-    const targetCity = searchCity || city;
+    let targetCity = searchCity || city;
     setInputError(null);
     setError(null);
     setWeather(null);
@@ -43,6 +64,10 @@ export default function App() {
       // desctrucuring
       const { location } = data;
       if (data && location && location.name) {
+        if (notification && notification !== '') {
+          setNotification('');
+        }
+        targetCity = targetCity !== location.name ? location.name : targetCity;
         setWeather(data);
         await saveHomeCity(targetCity);
         setHomeCity(targetCity);
@@ -72,6 +97,11 @@ export default function App() {
   };
 
   const handleRemoveHomeCity = async () => {
+    const savedHomeCity = await getHomeCity();
+    if (!savedHomeCity) {
+      setNotification('Empty city can not be removed.');
+      return;
+    }
     await deleteHomeCity();
     setHomeCity('');
     setWeather(null);
@@ -81,34 +111,27 @@ export default function App() {
   return (
     <View style={styles.container}>
       <Text style={styles.appTitle}>Weather Application</Text>
-      <Text style={styles.searchTitle}>Search weather in city</Text>
-      <TextInput
-        style={[styles.input, inputError ? styles.inputError : {}]}
-        value={city}
-        onChangeText={handleCityChange}
-        placeholder='Enter City...'
+      <SearchBar
+        styles={styles}
+        city={city}
+        inputError={inputError}
+        onCityChange={handleCityChange}
+        onSearchCity={() => handleSearchCity(city)}
       />
-      {inputError && <Text style={styles.inputErrorMessage}>{inputError}</Text>}
-      <TouchableOpacity style={styles.searchButton} onPress={() => handleSearchCity()}>
-        <Text style={styles.buttonText}>Search weather</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.removeButton} onPress={handleRemoveHomeCity}>
-        <Text style={styles.buttonText}>Remove home city</Text>
-      </TouchableOpacity>
-      {error && <Text style={styles.error}>{error}</Text>}
-      {loading && <Text>Loading...</Text>}
-
-      {weather && hasLoadedInitialCity && weather.location && (
+      <RemoveHomeCityButton styles={styles} onRemove={handleRemoveHomeCity} />
+      <StatusDisplay
+        styles={styles}
+        notification={notification}
+        error={error}
+        loading={loading}
+      />
+      {weather && weather.location && (
         <>
-          <Text style={styles.searchResult}>Weather search result</Text>
-          <View style={styles.result}>
-            <Text>Country: {weather.location.country}</Text>
-            <Text>City: {weather.location.name}</Text>
-            <Text>Local time: {weather.location.localtime}</Text>
-            <Text>Temperature: {weather.current.temp_c}°C</Text>
-            <Text>Condition: {weather.current.condition.text}</Text>
-            {homeCity && <Text>Home city: {homeCity}</Text>}
-          </View>
+          <WeatherResult
+            styles={styles}
+            weather={weather}
+            homeCity={homeCity}
+          />
         </>
       )}
       <StatusBar style='auto' />
@@ -143,9 +166,13 @@ const styles = StyleSheet.create({
     borderColor: 'red',
   },
   inputErrorMessage: {
-    fontSize: 16,
+    fontSize: 18,
     color: 'red',
     marginBottom: 20,
+  },
+  notification: {
+    fontSize: 18,
+    color: 'orange',
   },
   searchButton: {
     backgroundColor: 'green',
@@ -174,4 +201,9 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   result: { marginTop: 10 },
+  homeCity: {
+    fontSize: 20,
+    marginTop: 20,
+    fontWeight: 'bold',
+  },
 });
