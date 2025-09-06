@@ -14,7 +14,9 @@ export default function WeatherResult({
 }: WeatherResultProps) {
   return (
     <View>
-      <Text style={styles.searchResult}>Weather search result</Text>
+      <Text style={styles.searchResult}>
+        Weather in {weather.location.name}
+      </Text>
       <View style={styles.result}>
         <Text>Country: {weather.location.country}</Text>
         <Text>City: {weather.location.name}</Text>
@@ -22,7 +24,9 @@ export default function WeatherResult({
         <Text>Temperature: {weather.current.temp_c}°C</Text>
         <Text>Condition: {weather.current.condition.text}</Text>
       </View>
-      {homeCity && <Text style={styles.homeCity}>Location: {homeCity}</Text>}
+      {homeCity && (
+        <Text style={styles.homeCity}>Your current home city: {homeCity}</Text>
+      )}
     </View>
   );
 }
