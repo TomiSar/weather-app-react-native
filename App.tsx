@@ -1,6 +1,12 @@
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import {
+  StyleSheet,
+  Text,
+  View,
+  TouchableWithoutFeedback,
+  Keyboard,
+} from 'react-native';
 import { fetchCurrentWeather } from './services/weatherApi';
 import { WeatherAPIResponse } from './types';
 import {
@@ -9,9 +15,9 @@ import {
   saveHomeCity,
 } from './storage/preferences';
 import SearchBar from './components/SearchBar';
-import RemoveHomeCityButton from './components/RemoveHomeCityButton';
 import WeatherResult from './components/WeatherResult';
 import StatusDisplay from './components/StatusDisplay';
+import HomeCityButton from './components/HomeCityButton';
 
 export default function App() {
   const [city, setCity] = useState('');
@@ -21,6 +27,7 @@ export default function App() {
   const [notification, setNotification] = useState<string | null>(null);
   const [inputError, setInputError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const TIMEOUT = 2000;
 
   useEffect(() => {
     const loadInitialState = async () => {
@@ -46,37 +53,45 @@ export default function App() {
     loadInitialState();
   }, []);
 
-  const handleSearchCity = async (searchCity?: string) => {
-    let targetCity = searchCity || city;
+  const handleCityAction = async (
+    city: string,
+    updateCity: boolean = false,
+  ) => {
     setInputError(null);
     setError(null);
     setWeather(null);
 
-    if (!targetCity) {
-      setInputError('Please enter a city name');
+    if (!city || city.trim() === '') {
+      setInputError('City cannot be empty');
       return;
     }
-
     setLoading(true);
 
     try {
-      const data: WeatherAPIResponse = await fetchCurrentWeather(targetCity);
+      const data: WeatherAPIResponse = await fetchCurrentWeather(city);
       // desctrucuring
       const { location } = data;
       if (data && location && location.name) {
-        if (notification && notification !== '') {
-          setNotification('');
-        }
-        targetCity = targetCity !== location.name ? location.name : targetCity;
+        if (notification) setNotification('');
+
+        const homeCityName = city !== location.name ? location.name : city;
+
         setWeather(data);
-        await saveHomeCity(targetCity);
-        setHomeCity(targetCity);
+        setHomeCity(homeCityName);
+        await saveHomeCity(homeCityName);
+
+        if (updateCity) {
+          const updateSuccessMessage = `Homecity updated to ${homeCityName} successfully`;
+          setNotification(updateSuccessMessage);
+          setTimeout(() => {
+            setNotification(null);
+          }, TIMEOUT);
+        }
       } else {
         // API Response Error
         throw new Error('Received unexpected weather data format.');
       }
     } catch (error: unknown) {
-      console.error('Weather fetch failed:', error);
       if (error instanceof Error) {
         setError(error.message);
       } else {
@@ -89,6 +104,15 @@ export default function App() {
     }
   };
 
+  // Wrapper methods
+  const handleSearchCity = () => {
+    handleCityAction(city);
+  };
+
+  const handleUpdateCity = () => {
+    handleCityAction(city || homeCity, true);
+  };
+
   const handleCityChange = (cityText: string) => {
     setCity(cityText);
     if (cityText) {
@@ -96,46 +120,62 @@ export default function App() {
     }
   };
 
-  const handleRemoveHomeCity = async () => {
-    const savedHomeCity = await getHomeCity();
-    if (!savedHomeCity) {
-      setNotification('Empty city can not be removed.');
-      return;
-    }
+  const handleRemoveCity = async () => {
+    setNotification(`Home city ${homeCity} removed.`);
     await deleteHomeCity();
     setHomeCity('');
     setWeather(null);
     setError(null);
+    setTimeout(() => setNotification(null), TIMEOUT);
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.appTitle}>Weather Application</Text>
-      <SearchBar
-        styles={styles}
-        city={city}
-        inputError={inputError}
-        onCityChange={handleCityChange}
-        onSearchCity={() => handleSearchCity(city)}
-      />
-      <RemoveHomeCityButton styles={styles} onRemove={handleRemoveHomeCity} />
-      <StatusDisplay
-        styles={styles}
-        notification={notification}
-        error={error}
-        loading={loading}
-      />
-      {weather && weather.location && (
-        <>
-          <WeatherResult
-            styles={styles}
-            weather={weather}
-            homeCity={homeCity}
-          />
-        </>
-      )}
-      <StatusBar style='auto' />
-    </View>
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+      <View style={styles.container}>
+        <Text style={styles.appTitle}>Weather Application</Text>
+        <SearchBar
+          styles={styles}
+          city={city}
+          inputError={inputError}
+          onCityChange={handleCityChange}
+          onSearchCity={handleSearchCity}
+        />
+
+        {homeCity && (
+          <>
+            <HomeCityButton
+              styles={styles}
+              label='Remove home city'
+              variant='remove'
+              opPress={handleRemoveCity}
+            />
+            <HomeCityButton
+              styles={styles}
+              label='Update home city'
+              variant='update'
+              opPress={handleUpdateCity}
+            />
+          </>
+        )}
+
+        <StatusDisplay
+          styles={styles}
+          notification={notification}
+          error={error}
+          loading={loading}
+        />
+        {weather && weather.location && (
+          <>
+            <WeatherResult
+              styles={styles}
+              weather={weather}
+              homeCity={homeCity}
+            />
+          </>
+        )}
+        <StatusBar style='auto' />
+      </View>
+    </TouchableWithoutFeedback>
   );
 }
 
@@ -184,11 +224,17 @@ const styles = StyleSheet.create({
     backgroundColor: 'red',
     padding: 10,
     borderRadius: 5,
+    marginBottom: 10,
   },
   buttonText: {
     color: 'white',
     textAlign: 'center',
     fontWeight: 'bold',
+  },
+  updateButton: {
+    backgroundColor: 'blue',
+    padding: 10,
+    borderRadius: 5,
   },
   error: {
     color: 'red',

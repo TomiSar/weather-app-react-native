@@ -7,7 +7,7 @@ const WEATHER_API_URL = extra?.WEATHER_API_URL;
 const WEATHER_API_KEY = extra?.WEATHER_API_KEY;
 
 export const fetchCurrentWeather = async (
-  location: string
+  location: string,
 ): Promise<WeatherAPIResponse> => {
   if (!WEATHER_API_URL || !WEATHER_API_KEY) {
     throw new Error('Weather API URL or Key is not configured.');
@@ -24,7 +24,7 @@ export const fetchCurrentWeather = async (
       }));
 
       throw new Error(
-        `Failed to fetch weather data! Message: ${errorData.message} - status: ${response.status} - `
+        `Failed to fetch weather data! Message: ${errorData.message} - status: ${response.status} - `,
       );
     }
     const data: WeatherAPIResponse = await response.json();
