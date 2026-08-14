@@ -1,7 +1,7 @@
 import Constants from 'expo-constants';
 import { WeatherAPIResponse } from '../types';
 
-const extra = Constants.expoConfig?.extra ?? Constants.manifest?.extra;
+const extra = Constants.expoConfig?.extra;
 
 const WEATHER_API_URL = extra?.WEATHER_API_URL;
 const WEATHER_API_KEY = extra?.WEATHER_API_KEY;
