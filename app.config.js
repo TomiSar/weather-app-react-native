@@ -3,8 +3,8 @@ export default {
     name: 'WeatherApp',
     slug: 'weatherapp',
     extra: {
-      WEATHER_API_URL: 'https://api.weatherapi.com/v1/current.json?key=',
-      WEATHER_API_KEY: 'REDACTED',
+      WEATHER_API_URL: process.env.WEATHER_API_URL,
+      WEATHER_API_KEY: process.env.WEATHER_API_KEY,
       eas: {
         projectId: '5f138447-8ff3-4172-8ba6-15605e87ad1b',
       },

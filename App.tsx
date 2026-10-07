@@ -35,9 +35,8 @@ export default function App() {
 
       if (savedHomeCity) {
         try {
-          const data: WeatherAPIResponse = await fetchCurrentWeather(
-            savedHomeCity,
-          );
+          const data: WeatherAPIResponse =
+            await fetchCurrentWeather(savedHomeCity);
           const { location } = data;
           savedHomeCity =
             savedHomeCity !== location.name ? location.name : savedHomeCity;
@@ -246,7 +245,16 @@ const styles = StyleSheet.create({
     textAlign: 'left',
     marginTop: 20,
   },
-  result: { marginTop: 10 },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    fontWeight: 'bold',
+  },
+  resultIcon: {
+    width: 48,
+    height: 48,
+  },
+  result: { marginTop: 8 },
   homeCity: {
     fontSize: 20,
     marginTop: 20,
